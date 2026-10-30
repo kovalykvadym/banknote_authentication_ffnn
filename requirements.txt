@@ -1,7 +1,7 @@
-numpy
-pandas
-scikit-learn
-tensorflow
-matplotlib
-openpyxl
-python-docx
+numpy==2.5.4
+pandas==3.1.0
+scikit-learn==1.9.1
+tensorflow==2.21.0
+matplotlib==3.11.2
+openpyxl==3.1.5
+python-docx==1.2.0
