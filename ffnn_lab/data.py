@@ -88,6 +88,19 @@ def load_dataset(path: Path = config.DATA_PATH) -> pd.DataFrame:
 
 
 def convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert the feature and target columns to numeric types.
+
+    Args:
+        df: Table returned by `load_dataset`.
+
+    Returns:
+        A copy of the table with all required columns converted to numbers.
+        The input table is not modified.
+
+    Raises:
+        ValueError: If a required column is missing or contains values
+            that cannot be converted to numbers.
+    """
     required_columns = [
         *config.FEATURE_COLUMNS,
         config.TARGET_COLUMN,
@@ -116,18 +129,17 @@ def convert_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def validate_dataset(df: pd.DataFrame) -> None:
-    """Convert the feature and target columns to numeric types.
+    """Check that the table is ready for training.
+
+    The table must contain only numeric columns, with no missing or
+    infinite values. The target column must contain only the labels 0 and 1,
+    and both classes must be present. The table is not modified.
 
     Args:
-        df: Table returned by `load_dataset`.
-
-    Returns:
-        A copy of the table with all required columns converted to numbers.
-        The input table is not modified.
+        df: Table returned by `convert_numeric_columns`.
 
     Raises:
-        ValueError: If a required column is missing or contains values
-            that cannot be converted to numbers.
+        ValueError: If any of the checks above fails.
     """
     non_numeric = df.select_dtypes(exclude=["number"]).columns.tolist()
     if non_numeric:
