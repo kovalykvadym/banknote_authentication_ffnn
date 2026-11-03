@@ -54,4 +54,10 @@ def classification_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
             f"Length mismatch: y_true has {y_true.size}, y_pred has {y_pred.size}"
         )
 
+    if not (np.isin(y_true, (0, 1)).all() and np.isin(y_pred, (0, 1)).all()):
+        raise ValueError(
+            "Labels must be 0 or 1. Convert bipolar labels (-1/+1) "
+            "back to 0/1 before computing the error."
+        )
+
     return float(np.mean(y_true != y_pred))
