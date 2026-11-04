@@ -17,8 +17,11 @@ TARGET_COLUMN = "class"
 TEST_SIZE = 0.3
 RANDOM_SEED = 42
 
-# Early stopping
-MAX_EPOCHS = 500
+# Early stopping: training stops when the training error has not improved
+# by at least MIN_DELTA for PATIENCE consecutive epochs, or after MAX_EPOCHS.
+# The limit is high enough that slow settings (small learning rate, sigmoid)
+# stop by themselves instead of being cut off.
+MAX_EPOCHS = 5000
 PATIENCE = 10
 MIN_DELTA = 0.0001
 
