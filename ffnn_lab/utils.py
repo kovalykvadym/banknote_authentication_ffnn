@@ -73,7 +73,7 @@ def classification_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
     Raises:
         ValueError: If the arrays are empty, differ in length, or contain
-        values other than 0 and 1.
+            values other than 0 and 1.
     """
     y_true = np.ravel(y_true)
     y_pred = np.ravel(y_pred)
