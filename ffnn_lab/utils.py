@@ -1,5 +1,6 @@
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -92,3 +93,20 @@ def classification_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
         )
 
     return float(np.mean(y_true != y_pred))
+
+
+@dataclass(frozen=True)
+class TrainingResult:
+    """Outcome of one training run.
+
+    Attributes:
+        epochs_run: Number of epochs actually performed.
+        stopped_early: True if training stopped before `max_epochs`.
+        training_time: Training time in seconds.
+        loss_history: Training loss after each epoch.
+    """
+
+    epochs_run: int
+    stopped_early: bool
+    training_time: float
+    loss_history: list[float]

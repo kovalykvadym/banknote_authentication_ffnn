@@ -1,30 +1,11 @@
-from dataclasses import dataclass
-
 import numpy as np
 
 from ffnn_lab import config
 from ffnn_lab.activations import get_activation
 from ffnn_lab.data import to_bipolar
-from ffnn_lab.utils import outputs_to_labels, Timer
+from ffnn_lab.utils import outputs_to_labels, Timer, TrainingResult
 
 LEARNING_RULES = ("rosenblatt", "delta")
-
-
-@dataclass(frozen=True)
-class TrainingResult:
-    """Outcome of one training run.
-
-    Attributes:
-        epochs_run: Number of epochs actually performed.
-        stopped_early: True if training stopped before `max_epochs`.
-        training_time: Training time in seconds.
-        loss_history: Training loss after each epoch.
-    """
-
-    epochs_run: int
-    stopped_early: bool
-    training_time: float
-    loss_history: list[float]
 
 
 class SingleLayerPerceptron:
