@@ -64,6 +64,7 @@ class MultilayerPerceptron:
                     "has none"
                 )
 
+        self.optimizer_name = optimizer
         self.optimizer = get_optimizer(optimizer, learning_rate)
         self.learning_rate = learning_rate
         self.seed = seed
