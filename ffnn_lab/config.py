@@ -40,6 +40,8 @@ LEARNING_RATE_GRID = (
     0.1,
     0.3,
     1.0,
+    3.0,
+    10.0,
 )
 N_REPEATS = 5
 
