@@ -124,7 +124,7 @@ class MultilayerPerceptron:
 
         Args:
             X: Scaled features, shape (n, n_features).
-            Y: Labels 0/1, shape (n,).
+            y: Labels 0/1, shape (n,).
             batch_size: Samples per weight update. None means the whole set.
             max_epochs: Upper limit of epochs.
             patience: Epochs without improvement before stopping.
@@ -135,7 +135,7 @@ class MultilayerPerceptron:
             reached or the training diverged.
 
         Raises:
-            ValueError: If the shapes of `X` and `Y` do not fit the network
+            ValueError: If the shapes of `X` and `y` do not fit the network
                 or `batch_size` is not positive.
         """
         self._check_training_data(X, y)
