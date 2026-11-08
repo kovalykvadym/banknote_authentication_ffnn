@@ -1,0 +1,196 @@
+"""Group D: influence of the learning rate on the training time.
+
+Trains a single-layer perceptron (tanh, delta rule) and a multilayer
+perceptron 4-1 (tanh-tanh) with plain SGD for every learning rate from
+`config.LEARNING_RATE_GRID`. Every setup is repeated with several seeds
+(different initial weights and batch order), because one run is not enough
+to see the typical behavior.
+
+The study is made for two stopping tolerances: the main `config.MIN_DELTA`
+and the stricter `STRICT_MIN_DELTA`, to check whether the conclusions depend
+on the stopping criterion.
+
+Results in `results/`:
+    lr_study.csv            every run
+    lr_study_summary.csv    mean and spread over the seeds
+    figures/lr_*.png        graphs (training time, epochs, test error)
+
+Run from the project root: python run_lr_study.py
+"""
+
+import math
+from collections.abc import Callable
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import pandas as pd
+
+from ffnn_lab import config
+from ffnn_lab.data import prepare_dataset
+from ffnn_lab.mlp import MultilayerPerceptron
+from ffnn_lab.perceptron import SingleLayerPerceptron
+from ffnn_lab.utils import classification_error
+
+STRICT_MIN_DELTA = 1e-6
+
+# Model name -> function (learning rate, seed) -> new untrained model.
+MODELS: dict[str, Callable[[float, int], object]] = {
+    "Single-layer perceptron (tanh, delta rule)": lambda lr, seed: (
+        SingleLayerPerceptron("tanh", "delta", lr, seed=seed)
+    ),
+    "MLP 4-1 (tanh-tanh, SGD)": lambda lr, seed: (
+        MultilayerPerceptron(("tanh", "tanh"), "sgd", lr, seed=seed)
+    ),
+}
+
+
+def run_study(
+    learning_rates: tuple[float, ...] = config.LEARNING_RATE_GRID,
+    min_deltas: tuple[float, ...] = (config.MIN_DELTA, STRICT_MIN_DELTA),
+    repeats: int = config.N_REPEATS,
+) -> pd.DataFrame:
+    """Train every setup `repeats` times and return one row per run."""
+    split = prepare_dataset()
+
+    rows = []
+    for model_name, make_model in MODELS.items():
+        for min_delta in min_deltas:
+            for learning_rate in learning_rates:
+                for repeat in range(repeats):
+                    seed = config.RANDOM_SEED + repeat
+                    model = make_model(learning_rate, seed)
+                    training = model.fit(
+                        split.X_train,
+                        split.y_train,
+                        batch_size=config.BATCH_SIZE,
+                        max_epochs=config.MAX_EPOCHS,
+                        patience=config.PATIENCE,
+                        min_delta=min_delta,
+                    )
+                    final_loss = training.loss_history[-1]
+                    test_error = classification_error(
+                        split.y_test, model.predict(split.X_test)
+                    )
+                    rows.append(
+                        {
+                            "model": model_name,
+                            "min_delta": min_delta,
+                            "learning_rate": learning_rate,
+                            "seed": seed,
+                            "epochs": training.epochs_run,
+                            "training_time_s": training.training_time,
+                            "final_loss": final_loss,
+                            "test_error_pct": test_error * 100,
+                            "stopped_early": training.stopped_early,
+                            "diverged": not math.isfinite(final_loss),
+                        }
+                    )
+                print(
+                    f"{model_name} | min_delta={min_delta:g} | "
+                    f"lr={learning_rate:g} done",
+                    flush=True,
+                )
+    return pd.DataFrame(rows)
+
+
+def summarize(table: pd.DataFrame) -> pd.DataFrame:
+    """Average the runs over the seeds for every (model, tolerance, rate)."""
+    table = table.assign(
+        hit_limit=~table["stopped_early"] & ~table["diverged"],
+    )
+    summary = table.groupby(["model", "min_delta", "learning_rate"], sort=False).agg(
+        epochs_mean=("epochs", "mean"),
+        time_mean_s=("training_time_s", "mean"),
+        time_min_s=("training_time_s", "min"),
+        time_max_s=("training_time_s", "max"),
+        test_error_mean_pct=("test_error_pct", "mean"),
+        runs_hit_epoch_limit=("hit_limit", "sum"),
+        runs_diverged=("diverged", "sum"),
+    )
+    return summary.reset_index()
+
+
+def plot_metric(
+    table: pd.DataFrame,
+    column: str,
+    ylabel: str,
+    path: Path,
+    log_y: bool,
+) -> None:
+    """Draw `column` against the learning rate, one panel per model.
+
+    The line is the mean over the seeds, the band is the range from the
+    smallest to the largest value. One line per stopping tolerance.
+    """
+    models = list(MODELS)
+    fig, axes = plt.subplots(1, len(models), figsize=(11, 4.2))
+    for axis, model_name in zip(axes, models):
+        part = table[table["model"] == model_name]
+        for min_delta, group in part.groupby("min_delta", sort=True):
+            stats = group.groupby("learning_rate")[column].agg(["mean", "min", "max"])
+            line = axis.plot(
+                stats.index,
+                stats["mean"],
+                marker="o",
+                label=f"min_delta={min_delta:g}",
+            )[0]
+            axis.fill_between(
+                stats.index,
+                stats["min"],
+                stats["max"],
+                alpha=0.2,
+                color=line.get_color(),
+            )
+        axis.set_xscale("log")
+        if log_y:
+            axis.set_yscale("log")
+        axis.set_title(model_name, fontsize=10)
+        axis.set_xlabel("Learning rate")
+        axis.set_ylabel(ylabel)
+        axis.grid(True, which="both", alpha=0.3)
+        axis.legend()
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
+def main(
+    results_dir: Path = config.RESULTS_DIR,
+    learning_rates: tuple[float, ...] = config.LEARNING_RATE_GRID,
+    repeats: int = config.N_REPEATS,
+) -> None:
+    """Run the study, save the tables and draw the graphs."""
+    table = run_study(learning_rates=learning_rates, repeats=repeats)
+    summary = summarize(table)
+
+    results_dir.mkdir(parents=True, exist_ok=True)
+    table.to_csv(results_dir / "lr_study.csv", index=False)
+    summary.to_csv(results_dir / "lr_study_summary.csv", index=False)
+
+    figures = results_dir / "figures"
+    plot_metric(
+        table, "training_time_s", "Training time, s", figures / "lr_time.png", True
+    )
+    plot_metric(table, "epochs", "Epochs", figures / "lr_epochs.png", True)
+    plot_metric(
+        table, "test_error_pct", "Test error, %", figures / "lr_error.png", False
+    )
+
+    print()
+    rounding = {
+        "epochs_mean": 1,
+        "time_mean_s": 3,
+        "time_min_s": 3,
+        "time_max_s": 3,
+        "test_error_mean_pct": 2,
+    }
+    print(summary.round(rounding).to_string(index=False))
+    print(f"\nSaved to {results_dir}")
+
+
+if __name__ == "__main__":
+    main()
