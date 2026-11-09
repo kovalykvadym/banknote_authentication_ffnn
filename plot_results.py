@@ -46,6 +46,8 @@ TEXT = {
         "rbf_time_title": "RBF-мережа: час класифікації",
         "vs_training_time": "Точність і час навчання",
         "vs_classification_time": "Точність і час класифікації",
+        "batch_size": "Розмір батча",
+        "batch_full": "весь набір",
         "models": {
             "Single-layer perceptron (tanh, delta rule)": (
                 "Одношаровий перцептрон (tanh, дельта-правило)"
@@ -80,6 +82,8 @@ TEXT = {
         "rbf_time_title": "RBF network: classification time",
         "vs_training_time": "Accuracy and training time",
         "vs_classification_time": "Accuracy and classification time",
+        "batch_size": "Batch size",
+        "batch_full": "full set",
         "models": {
             "Single-layer perceptron (tanh, delta rule)": (
                 "Single-layer perceptron (tanh, delta rule)"
@@ -271,6 +275,53 @@ def plot_architectures(summary: pd.DataFrame, path: Path) -> None:
     _save(fig, path)
 
 
+def plot_batch_study(table: pd.DataFrame, path: Path) -> None:
+    """Grouped bars: epochs, training time and test error by batch size.
+
+    One group of bars per batch size, one bar per (optimizer, learning rate).
+    The whiskers show the range over the seeds.
+    """
+    table = table.assign(batch_size=table["batch_size"].astype(str))
+    batch_sizes = ["1", "32", "full"]
+    setups = list(table.groupby(["optimizer", "learning_rate"], sort=False))
+    panels = (
+        ("epochs", "epochs", True),
+        ("training_time_s", "training_time", True),
+        ("test_error_pct", "test_error", False),
+    )
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
+    width = 0.8 / len(setups)
+    for axis, (column, ylabel_key, log_y) in zip(axes, panels):
+        for i, ((optimizer, learning_rate), part) in enumerate(setups):
+            stats = (
+                part.groupby("batch_size")[column]
+                .agg(["mean", "min", "max"])
+                .reindex(batch_sizes)
+            )
+            shift = (i - (len(setups) - 1) / 2) * width
+            positions = np.arange(len(batch_sizes)) + shift
+            axis.bar(
+                positions,
+                stats["mean"],
+                width,
+                yerr=[stats["mean"] - stats["min"], stats["max"] - stats["mean"]],
+                capsize=3,
+                label=f"{_text('optimizer_names')[optimizer]}, lr={learning_rate:g}",
+            )
+        axis.set_xticks(np.arange(len(batch_sizes)))
+        axis.set_xticklabels(
+            [_text("batch_full") if b == "full" else b for b in batch_sizes],
+        )
+        if log_y:
+            axis.set_yscale("log")
+        axis.set_xlabel(_text("batch_size"))
+        axis.set_ylabel(_text(ylabel_key))
+        axis.grid(True, axis="y", which="both", alpha=0.3)
+    axes[0].legend(fontsize=8)
+    _save(fig, path)
+
+
 def main(results_dir: Path = config.RESULTS_DIR) -> None:
     """Draw all graphs that can be drawn from the saved tables."""
     figures = results_dir / "figures"
@@ -296,6 +347,12 @@ def main(results_dir: Path = config.RESULTS_DIR) -> None:
         )
     else:
         print(f"Skipped: {lr_path} not found (run run_lr_study.py)")
+
+    batch_path = results_dir / "batch_study.csv"
+    if batch_path.exists():
+        plot_batch_study(pd.read_csv(batch_path), figures / "batch_study.png")
+    else:
+        print(f"Skipped: {batch_path} not found (run run_batch_study.py)")
 
     print(f"Graphs saved to {figures}")
 
